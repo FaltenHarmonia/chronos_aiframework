@@ -9,6 +9,9 @@ import sys
 import json
 import itertools
 import random
+import faulthandler
+import time
+import traceback
 from copy import deepcopy
 from pathlib import Path
 from functools import partial
@@ -20,6 +23,7 @@ import numpy as np
 import torch
 import torch.distributed as dist
 from torch.utils.data import IterableDataset, get_worker_info
+import datasets  # noqa: F401
 import transformers
 from packaging import version
 from transformers import (
@@ -51,6 +55,8 @@ _TRANSFORMERS_V5 = version.parse(transformers.__version__) >= version.parse("5.0
 
 app = typer.Typer(pretty_exceptions_enable=False)
 
+faulthandler.enable(all_threads=True)
+
 
 def is_main_process() -> bool:
     """
@@ -67,6 +73,45 @@ def log_on_main(msg: str, logger: logging.Logger, log_level: int = logging.INFO)
     """
     if is_main_process():
         logger.log(log_level, msg)
+
+
+def atomic_write_json(path: Path, payload: Dict):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_suffix(path.suffix + ".tmp")
+    with open(tmp_path, "w") as fp:
+        json.dump(payload, fp, indent=4)
+    os.replace(tmp_path, path)
+
+
+def update_training_progress(output_dir: Path, stage: str, **extra):
+    if not is_main_process():
+        return
+    payload = {
+        "stage": stage,
+        "updated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        **extra,
+    }
+    atomic_write_json(output_dir / "training_progress.json", payload)
+    log_on_main(f"Stage: {stage}", logger)
+
+
+def describe_training_data_paths(paths: List[str]) -> List[Dict]:
+    descriptions = []
+    for data_path in paths:
+        path = Path(data_path)
+        item = {
+            "path": str(path),
+            "exists": path.exists(),
+            "is_file": path.is_file(),
+        }
+        if path.exists() and path.is_file():
+            item["bytes"] = path.stat().st_size
+            item["modified_at"] = time.strftime(
+                "%Y-%m-%dT%H:%M:%S",
+                time.localtime(path.stat().st_mtime),
+            )
+        descriptions.append(item)
+    return descriptions
 
 
 def get_training_job_info() -> Dict:
@@ -117,6 +162,37 @@ def save_training_info(ckpt_path: Path, training_config: Dict):
             fp,
             indent=4,
         )
+
+
+def save_preflight_info(output_dir: Path, training_config: Dict, data_paths: List[str]):
+    if not is_main_process():
+        return
+    atomic_write_json(
+        output_dir / "training_preflight.json",
+        {
+            "training_config": training_config,
+            "job_info": get_training_job_info(),
+            "data_paths": describe_training_data_paths(data_paths),
+            "cwd": os.getcwd(),
+            "argv": sys.argv,
+        },
+    )
+
+
+def fail_with_diagnostics(output_dir: Path, stage: str, exc: BaseException):
+    if is_main_process():
+        atomic_write_json(
+            output_dir / "training_failure.json",
+            {
+                "stage": stage,
+                "failed_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                "exception_type": type(exc).__name__,
+                "exception": str(exc),
+                "traceback": traceback.format_exc(),
+                "job_info": get_training_job_info(),
+            },
+        )
+        update_training_progress(output_dir, "failed", failed_stage=stage)
 
 
 def get_next_path(
@@ -562,138 +638,174 @@ def main(
 
     raw_training_config = deepcopy(locals())
     output_dir = Path(output_dir)
-    training_data_paths = ast.literal_eval(training_data_paths)
-    assert isinstance(training_data_paths, list)
 
-    if isinstance(probability, str):
-        probability = ast.literal_eval(probability)
-    elif probability is None:
-        probability = [1.0 / len(training_data_paths)] * len(training_data_paths)
-    assert isinstance(probability, list)
+    try:
+        training_data_paths = ast.literal_eval(training_data_paths)
+        assert isinstance(training_data_paths, list)
 
-    assert len(training_data_paths) == len(probability)
+        if isinstance(probability, str):
+            probability = ast.literal_eval(probability)
+        elif probability is None:
+            probability = [1.0 / len(training_data_paths)] * len(training_data_paths)
+        assert isinstance(probability, list)
 
-    if dataloader_num_workers > len(training_data_paths):
+        assert len(training_data_paths) == len(probability)
+
+        if dataloader_num_workers > len(training_data_paths):
+            log_on_main(
+                f"Setting the number of data loader workers to {len(training_data_paths)}, "
+                f"instead of {dataloader_num_workers}.",
+                logger,
+            )
+            dataloader_num_workers = len(training_data_paths)
+
+        if isinstance(tokenizer_kwargs, str):
+            tokenizer_kwargs = ast.literal_eval(tokenizer_kwargs)
+        assert isinstance(tokenizer_kwargs, dict)
+
+        assert model_type in ["seq2seq", "causal"]
+
+        output_dir = get_next_path("run", base_dir=output_dir, file_type="")
+        output_dir.mkdir(parents=True, exist_ok=True)
+        update_training_progress(output_dir, "config_parsed", seed=seed)
+        save_preflight_info(output_dir, raw_training_config, training_data_paths)
+
+        log_on_main(f"Logging dir: {output_dir}", logger)
         log_on_main(
-            f"Setting the number of data loader workers to {len(training_data_paths)}, "
-            f"instead of {dataloader_num_workers}.",
+            f"Loading and filtering {len(training_data_paths)} datasets "
+            f"for training: {training_data_paths}",
             logger,
         )
-        dataloader_num_workers = len(training_data_paths)
 
-    if isinstance(tokenizer_kwargs, str):
-        tokenizer_kwargs = ast.literal_eval(tokenizer_kwargs)
-    assert isinstance(tokenizer_kwargs, dict)
+        missing_paths = [path for path in training_data_paths if not Path(path).is_file()]
+        if missing_paths:
+            raise FileNotFoundError(f"Training data files not found: {missing_paths}")
 
-    assert model_type in ["seq2seq", "causal"]
-
-    output_dir = get_next_path("run", base_dir=output_dir, file_type="")
-
-    log_on_main(f"Logging dir: {output_dir}", logger)
-    log_on_main(
-        f"Loading and filtering {len(training_data_paths)} datasets "
-        f"for training: {training_data_paths}",
-        logger,
-    )
-
-    log_on_main(
-        f"Mixing probabilities: {probability}",
-        logger,
-    )
-
-    train_datasets = [
-        Filter(
-            partial(
-                has_enough_observations,
-                min_length=min_past + prediction_length,
-                max_missing_prop=max_missing_prop,
-            ),
-            FileDataset(path=Path(data_path), freq="h"),
+        log_on_main(
+            f"Mixing probabilities: {probability}",
+            logger,
         )
-        for data_path in training_data_paths
-    ]
-
-    log_on_main("Initializing model", logger)
-
-    model = load_model(
-        model_id=model_id,
-        model_type=model_type,
-        vocab_size=n_tokens,
-        random_init=random_init,
-        tie_embeddings=tie_embeddings,
-        pad_token_id=pad_token_id,
-        eos_token_id=eos_token_id,
-    )
-
-    chronos_config = ChronosConfig(
-        tokenizer_class=tokenizer_class,
-        tokenizer_kwargs=tokenizer_kwargs,
-        n_tokens=n_tokens,
-        n_special_tokens=n_special_tokens,
-        pad_token_id=pad_token_id,
-        eos_token_id=eos_token_id,
-        use_eos_token=use_eos_token,
-        model_type=model_type,
-        context_length=context_length,
-        prediction_length=prediction_length,
-        num_samples=num_samples,
-        temperature=temperature,
-        top_k=top_k,
-        top_p=top_p,
-    )
-
-    # Add extra items to model config so that it's saved in the ckpt
-    model.config.chronos_config = chronos_config.__dict__
-
-    shuffled_train_dataset = ChronosDataset(
-        datasets=train_datasets,
-        probabilities=probability,
-        tokenizer=chronos_config.create_tokenizer(),
-        context_length=context_length,
-        prediction_length=prediction_length,
-        min_past=min_past,
-        model_type=model_type,
-        imputation_method=LastValueImputation() if model_type == "causal" else None,
-        mode="training",
-    ).shuffle(shuffle_buffer_length=shuffle_buffer_length)
-
-    # Define training args
-    training_args = TrainingArguments(
-        output_dir=str(output_dir),
-        per_device_train_batch_size=per_device_train_batch_size,
-        learning_rate=learning_rate,
-        lr_scheduler_type=lr_scheduler_type,
-        **({"warmup_steps": round(warmup_ratio * max_steps)} if _TRANSFORMERS_V5 else {"warmup_ratio": warmup_ratio}),
-        optim=optim,
-        logging_strategy="steps",
-        logging_steps=log_steps,
-        save_strategy="steps",
-        save_steps=save_steps,
-        report_to=["tensorboard"],
-        max_steps=max_steps,
-        gradient_accumulation_steps=gradient_accumulation_steps,
-        dataloader_num_workers=dataloader_num_workers,
-        tf32=tf32,  # remove this if not using Ampere GPUs (e.g., A100)
-        torch_compile=torch_compile,
-        ddp_find_unused_parameters=False,
-        remove_unused_columns=False,
-    )
-
-    # Create Trainer instance
-    trainer = Trainer(
-        model=model,
-        args=training_args,
-        train_dataset=shuffled_train_dataset,
-    )
-    log_on_main("Training", logger)
-
-    trainer.train()
-
-    if is_main_process():
-        model.save_pretrained(output_dir / "checkpoint-final")
-        save_training_info(
-            output_dir / "checkpoint-final", training_config=raw_training_config
+        update_training_progress(
+            output_dir,
+            "data_preflight_complete",
+            data_paths=describe_training_data_paths(training_data_paths),
         )
+
+        train_datasets = [
+            Filter(
+                partial(
+                    has_enough_observations,
+                    min_length=min_past + prediction_length,
+                    max_missing_prop=max_missing_prop,
+                ),
+                FileDataset(path=Path(data_path), freq="h"),
+            )
+            for data_path in training_data_paths
+        ]
+        update_training_progress(output_dir, "datasets_constructed")
+
+        log_on_main("Initializing model", logger)
+        update_training_progress(output_dir, "model_initializing", model_id=model_id)
+
+        model = load_model(
+            model_id=model_id,
+            model_type=model_type,
+            vocab_size=n_tokens,
+            random_init=random_init,
+            tie_embeddings=tie_embeddings,
+            pad_token_id=pad_token_id,
+            eos_token_id=eos_token_id,
+        )
+        update_training_progress(
+            output_dir,
+            "model_initialized",
+            parameter_count=sum(p.numel() for p in model.parameters()),
+        )
+
+        chronos_config = ChronosConfig(
+            tokenizer_class=tokenizer_class,
+            tokenizer_kwargs=tokenizer_kwargs,
+            n_tokens=n_tokens,
+            n_special_tokens=n_special_tokens,
+            pad_token_id=pad_token_id,
+            eos_token_id=eos_token_id,
+            use_eos_token=use_eos_token,
+            model_type=model_type,
+            context_length=context_length,
+            prediction_length=prediction_length,
+            num_samples=num_samples,
+            temperature=temperature,
+            top_k=top_k,
+            top_p=top_p,
+        )
+
+        # Add extra items to model config so that it's saved in the ckpt
+        model.config.chronos_config = chronos_config.__dict__
+
+        shuffled_train_dataset = ChronosDataset(
+            datasets=train_datasets,
+            probabilities=probability,
+            tokenizer=chronos_config.create_tokenizer(),
+            context_length=context_length,
+            prediction_length=prediction_length,
+            min_past=min_past,
+            model_type=model_type,
+            imputation_method=LastValueImputation() if model_type == "causal" else None,
+            mode="training",
+        ).shuffle(shuffle_buffer_length=shuffle_buffer_length)
+        update_training_progress(output_dir, "chronos_dataset_ready")
+
+        # Define training args
+        update_training_progress(output_dir, "training_args_initializing")
+        training_args = TrainingArguments(
+            output_dir=str(output_dir),
+            per_device_train_batch_size=per_device_train_batch_size,
+            learning_rate=learning_rate,
+            lr_scheduler_type=lr_scheduler_type,
+            **({"warmup_steps": round(warmup_ratio * max_steps)} if _TRANSFORMERS_V5 else {"warmup_ratio": warmup_ratio}),
+            optim=optim,
+            logging_strategy="steps",
+            logging_steps=log_steps,
+            save_strategy="steps",
+            save_steps=save_steps,
+            report_to=["tensorboard"],
+            max_steps=max_steps,
+            gradient_accumulation_steps=gradient_accumulation_steps,
+            dataloader_num_workers=dataloader_num_workers,
+            tf32=tf32,  # remove this if not using Ampere GPUs (e.g., A100)
+            torch_compile=torch_compile,
+            ddp_find_unused_parameters=False,
+            remove_unused_columns=False,
+        )
+
+        # Create Trainer instance
+        update_training_progress(output_dir, "trainer_initializing")
+        trainer = Trainer(
+            model=model,
+            args=training_args,
+            train_dataset=shuffled_train_dataset,
+        )
+        update_training_progress(output_dir, "trainer_initialized")
+        log_on_main("Training", logger)
+
+        update_training_progress(output_dir, "training_started", max_steps=max_steps)
+        trainer.train()
+        update_training_progress(output_dir, "training_finished")
+
+        if is_main_process():
+            update_training_progress(output_dir, "saving_final_checkpoint")
+            model.save_pretrained(output_dir / "checkpoint-final")
+            save_training_info(
+                output_dir / "checkpoint-final", training_config=raw_training_config
+            )
+            update_training_progress(
+                output_dir,
+                "complete",
+                final_checkpoint=str(output_dir / "checkpoint-final"),
+            )
+    except Exception as exc:
+        fail_with_diagnostics(output_dir, "training_main", exc)
+        raise
 
 
 if __name__ == "__main__":

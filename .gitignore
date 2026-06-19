@@ -163,6 +163,8 @@ cython_debug/
 .DS_store
 
 chronos-2-finetuned
+data/
+outputs/
 
 # Kiro IDE
 .kiro
