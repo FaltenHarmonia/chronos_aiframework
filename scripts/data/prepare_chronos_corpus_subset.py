@@ -108,10 +108,36 @@ def clean_target(raw_target, min_length, max_length, max_nan_ratio, rng, stats):
     return target.astype(np.float32)
 
 
-def collect_records(config_name, count, args, seed_offset=0):
+def iter_clean_records(config_name, count, args, stats, seed_offset=0):
     rng = np.random.default_rng(args.seed + seed_offset)
     ds = load_dataset(HF_DATASET_NAME, config_name, split="train", streaming=True)
-    stats = {
+    pbar = tqdm(total=count, desc=f"Collecting {config_name}")
+    try:
+        for row in ds:
+            stats["seen"] += 1
+            target = clean_target(
+                extract_target(row),
+                min_length=args.min_length,
+                max_length=args.max_length,
+                max_nan_ratio=args.max_nan_ratio,
+                rng=rng,
+                stats=stats,
+            )
+            if target is None:
+                continue
+            stats["written"] += 1
+            pbar.update(1)
+            yield {"start": np.datetime64("2000-01-01 00:00", "s"), "target": target}
+            if stats["written"] >= count:
+                break
+        if stats["written"] < count:
+            raise RuntimeError(f"{config_name}: wrote {stats['written']} / requested {count}")
+    finally:
+        pbar.close()
+
+
+def empty_stats():
+    return {
         "seen": 0,
         "written": 0,
         "invalid_target": 0,
@@ -120,37 +146,28 @@ def collect_records(config_name, count, args, seed_offset=0):
         "nan_filled": 0,
         "truncated": 0,
     }
-    records = []
-    pbar = tqdm(total=count, desc=f"Collecting {config_name}")
-    for row in ds:
-        stats["seen"] += 1
-        target = clean_target(
-            extract_target(row),
-            min_length=args.min_length,
-            max_length=args.max_length,
-            max_nan_ratio=args.max_nan_ratio,
-            rng=rng,
-            stats=stats,
-        )
-        if target is None:
-            continue
-        records.append({"start": np.datetime64("2000-01-01 00:00", "s"), "target": target})
-        stats["written"] += 1
-        pbar.update(1)
-        if len(records) >= count:
-            break
-    pbar.close()
-    if len(records) < count:
-        raise RuntimeError(f"{config_name}: wrote {len(records)} / requested {count}")
-    return records, stats
 
 
 def write_arrow(records, output_path: Path, compression: str):
     tmp_path = output_path.with_suffix(output_path.suffix + ".tmp")
     if tmp_path.exists():
         tmp_path.unlink()
-    ArrowWriter(compression=compression).write_to_file(records, path=tmp_path)
-    os.replace(tmp_path, output_path)
+    try:
+        ArrowWriter(compression=compression).write_to_file(records, path=tmp_path)
+        os.replace(tmp_path, output_path)
+    except Exception:
+        if tmp_path.exists():
+            tmp_path.unlink()
+        raise
+
+
+def build_output_names(args, tsmixup_count, kernel_count):
+    tsmixup_name = f"chronos_tsmixup_{count_label(tsmixup_count)}.arrow"
+    kernel_name = f"chronos_kernel_synth_{count_label(kernel_count)}.arrow"
+    if args.data_level == "debug":
+        tsmixup_name = f"chronos_debug_tsmixup_{tsmixup_count}.arrow"
+        kernel_name = f"chronos_debug_kernel_synth_{kernel_count}.arrow"
+    return tsmixup_name, kernel_name
 
 
 def main():
@@ -161,11 +178,7 @@ def main():
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    tsmixup_name = f"chronos_tsmixup_{count_label(tsmixup_count)}.arrow"
-    kernel_name = f"chronos_kernel_synth_{count_label(kernel_count)}.arrow"
-    if args.data_level == "debug":
-        tsmixup_name = f"chronos_debug_tsmixup_{tsmixup_count}.arrow"
-        kernel_name = f"chronos_debug_kernel_synth_{kernel_count}.arrow"
+    tsmixup_name, kernel_name = build_output_names(args, tsmixup_count, kernel_count)
 
     tsmixup_path = output_dir / tsmixup_name
     kernel_path = output_dir / kernel_name
@@ -189,19 +202,30 @@ def main():
         print(json.dumps(config_payload, ensure_ascii=False, indent=2))
         return
 
-    if tsmixup_path.exists() and kernel_path.exists() and not args.overwrite:
-        print("Output files already exist. Use --overwrite to regenerate.")
-        return
+    tsmixup_stats = empty_stats()
+    kernel_stats = empty_stats()
 
-    atomic_write_json(progress_path, {"status": "collecting_tsmixup", **config_payload})
-    tsmixup_records, tsmixup_stats = collect_records(TSMIXUP_CONFIG, tsmixup_count, args, seed_offset=0)
-    write_arrow(tsmixup_records, tsmixup_path, args.compression)
-    del tsmixup_records
+    if tsmixup_path.exists() and not args.overwrite:
+        atomic_write_json(progress_path, {"status": "skipping_existing_tsmixup", **config_payload})
+        tsmixup_stats["written"] = tsmixup_count
+    else:
+        atomic_write_json(progress_path, {"status": "collecting_tsmixup", **config_payload})
+        write_arrow(
+            iter_clean_records(TSMIXUP_CONFIG, tsmixup_count, args, tsmixup_stats, seed_offset=0),
+            tsmixup_path,
+            args.compression,
+        )
 
-    atomic_write_json(progress_path, {"status": "collecting_kernel_synth", **config_payload})
-    kernel_records, kernel_stats = collect_records(KERNEL_SYNTH_CONFIG, kernel_count, args, seed_offset=1)
-    write_arrow(kernel_records, kernel_path, args.compression)
-    del kernel_records
+    if kernel_path.exists() and not args.overwrite:
+        atomic_write_json(progress_path, {"status": "skipping_existing_kernel_synth", **config_payload})
+        kernel_stats["written"] = kernel_count
+    else:
+        atomic_write_json(progress_path, {"status": "collecting_kernel_synth", **config_payload})
+        write_arrow(
+            iter_clean_records(KERNEL_SYNTH_CONFIG, kernel_count, args, kernel_stats, seed_offset=1),
+            kernel_path,
+            args.compression,
+        )
 
     summary = {
         "status": "complete",

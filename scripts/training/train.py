@@ -195,6 +195,21 @@ def fail_with_diagnostics(output_dir: Path, stage: str, exc: BaseException):
         update_training_progress(output_dir, "failed", failed_stage=stage)
 
 
+def validate_resume_support(resume_from_checkpoint: Optional[str]):
+    if resume_from_checkpoint is None:
+        return
+    checkpoint_path = Path(resume_from_checkpoint)
+    optimizer_state = checkpoint_path / "optimizer.pt"
+    torch_version = version.parse(torch.__version__.split("+")[0])
+    if optimizer_state.exists() and torch_version < version.parse("2.6.0"):
+        raise RuntimeError(
+            "True Trainer resume requires loading optimizer.pt, but torch "
+            f"{torch.__version__} is below 2.6. Upgrade torch to >=2.6 on the cloud "
+            "environment, or continue from model weights by setting model_id to the "
+            "checkpoint path and random_init=false instead of using resume_from_checkpoint."
+        )
+
+
 def get_next_path(
     base_fname: str,
     base_dir: Path,
@@ -626,6 +641,7 @@ def main(
     dataset_name: str = "unspecified",
     data_level: str = "unspecified",
     seed: Optional[int] = None,
+    resume_from_checkpoint: Optional[str] = None,
 ):
     if tf32 and not (
         torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 8
@@ -680,6 +696,7 @@ def main(
         update_training_progress(output_dir, "config_parsed", seed=seed)
         log_on_main(f"Dataset name: {dataset_name}", logger)
         log_on_main(f"Data level: {data_level}", logger)
+        validate_resume_support(resume_from_checkpoint)
         save_preflight_info(output_dir, raw_training_config, training_data_paths)
 
         log_on_main(f"Logging dir: {output_dir}", logger)
@@ -807,7 +824,7 @@ def main(
         log_on_main("Training", logger)
 
         update_training_progress(output_dir, "training_started", max_steps=max_steps)
-        trainer.train()
+        trainer.train(resume_from_checkpoint=resume_from_checkpoint)
         update_training_progress(output_dir, "training_finished")
 
         if is_main_process():

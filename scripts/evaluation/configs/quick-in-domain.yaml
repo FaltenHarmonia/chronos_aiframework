@@ -1,0 +1,26 @@
+# Small in-domain set for checkpoint-by-checkpoint trend checks.
+- name: monash_electricity_hourly
+  hf_repo: autogluon/chronos_datasets
+  offset: -24
+  prediction_length: 24
+  num_rolls: 1
+- name: m4_hourly
+  hf_repo: autogluon/chronos_datasets
+  offset: -48
+  prediction_length: 48
+  num_rolls: 1
+- name: m4_daily
+  hf_repo: autogluon/chronos_datasets
+  offset: -14
+  prediction_length: 14
+  num_rolls: 1
+- name: m4_monthly
+  hf_repo: autogluon/chronos_datasets
+  offset: -18
+  prediction_length: 18
+  num_rolls: 1
+- name: monash_temperature_rain
+  hf_repo: autogluon/chronos_datasets
+  offset: -30
+  prediction_length: 30
+  num_rolls: 1

@@ -1,0 +1,26 @@
+# Small zero-shot set for checkpoint-by-checkpoint trend checks.
+- name: monash_traffic
+  hf_repo: autogluon/chronos_datasets
+  offset: -24
+  prediction_length: 24
+  num_rolls: 1
+- name: exchange_rate
+  hf_repo: autogluon/chronos_datasets
+  offset: -30
+  prediction_length: 30
+  num_rolls: 1
+- name: monash_weather
+  hf_repo: autogluon/chronos_datasets
+  offset: -30
+  prediction_length: 30
+  num_rolls: 1
+- name: m4_yearly
+  hf_repo: autogluon/chronos_datasets
+  offset: -6
+  prediction_length: 6
+  num_rolls: 1
+- name: monash_m3_quarterly
+  hf_repo: autogluon/chronos_datasets
+  offset: -8
+  prediction_length: 8
+  num_rolls: 1
