@@ -1,26 +1,26 @@
 training_data_paths:
-- "/home/ma-user/work/chronos_aiframework/data/processed/synthetic_fallback_1k.arrow"
+- "./data/processed/synthetic_fallback_50k.arrow"
 probability:
 - 1.0
 dataset_name: synthetic_fallback
-data_level: debug
-context_length: 128
-prediction_length: 16
-min_past: 128
-max_steps: 100
-save_steps: 100
-log_steps: 10
-per_device_train_batch_size: 4
+data_level: fallback
+context_length: 256
+prediction_length: 32
+min_past: 256
+max_steps: 5000
+save_steps: 1000
+log_steps: 50
+per_device_train_batch_size: 32
 learning_rate: 0.001
 optim: adamw_torch
 num_samples: 20
-shuffle_buffer_length: 200
-gradient_accumulation_steps: 4
+shuffle_buffer_length: 1000
+gradient_accumulation_steps: 1
 model_id: google/t5-efficient-tiny
 model_type: seq2seq
 random_init: true
 tie_embeddings: true
-output_dir: ./outputs/checkpoints/debug_tiny
+output_dir: ./outputs/checkpoints/chronos_t5_tiny_fallback
 tf32: false
 torch_compile: false
 tokenizer_class: MeanScaleUniformBins
@@ -30,7 +30,7 @@ tokenizer_kwargs:
 n_tokens: 4096
 n_special_tokens: 2
 lr_scheduler_type: linear
-warmup_ratio: 0.1
+warmup_ratio: 0.04
 dataloader_num_workers: 1
 max_missing_prop: 0.9
 use_eos_token: true

@@ -3,6 +3,8 @@
 
 # Authors: Abdul Fatir Ansari <ansarnd@amazon.com>
 
+from __future__ import annotations
+
 import math
 from enum import Enum
 from typing import Any, Iterator, Mapping, Sequence, TypeAlias, cast

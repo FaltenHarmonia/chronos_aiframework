@@ -5,6 +5,8 @@
 Preprocessing module for converting various input formats to list[PreparedInput] expected by Chronos2Dataset.
 """
 
+from __future__ import annotations
+
 from typing import Any, TypedDict
 
 import numpy as np

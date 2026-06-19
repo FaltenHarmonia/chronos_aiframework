@@ -3,6 +3,7 @@ set -euo pipefail
 
 mkdir -p data/processed data/eval outputs/logs cache/huggingface
 
+export HF_ENDPOINT="${HF_ENDPOINT:-https://hf-mirror.com}"
 export HF_HOME="${HF_HOME:-$(pwd)/cache/huggingface}"
 export HF_DATASETS_CACHE="${HF_DATASETS_CACHE:-$(pwd)/cache/huggingface/datasets}"
 export TRANSFORMERS_CACHE="${TRANSFORMERS_CACHE:-$(pwd)/cache/huggingface/transformers}"

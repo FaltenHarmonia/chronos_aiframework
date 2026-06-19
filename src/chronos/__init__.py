@@ -10,8 +10,20 @@ from .chronos import (
     ChronosTokenizer,
     MeanScaleUniformBins,
 )
-from .chronos2 import Chronos2ForecastingConfig, Chronos2Model, Chronos2Pipeline
-from .chronos_bolt import ChronosBoltConfig, ChronosBoltPipeline
+
+# Chronos-2 and Chronos-Bolt are optional (need newer transformers/peft)
+try:
+    from .chronos2 import Chronos2ForecastingConfig, Chronos2Model, Chronos2Pipeline
+except ImportError:
+    Chronos2ForecastingConfig = None  # type: ignore
+    Chronos2Model = None  # type: ignore
+    Chronos2Pipeline = None  # type: ignore
+
+try:
+    from .chronos_bolt import ChronosBoltConfig, ChronosBoltPipeline
+except ImportError:
+    ChronosBoltConfig = None  # type: ignore
+    ChronosBoltPipeline = None  # type: ignore
 
 __all__ = [
     "__version__",
