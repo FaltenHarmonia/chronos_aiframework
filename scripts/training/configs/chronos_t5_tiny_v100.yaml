@@ -1,0 +1,42 @@
+training_data_paths:
+- "./data/processed/chronos_tsmixup_900k.arrow"
+- "./data/processed/chronos_kernel_synth_100k.arrow"
+probability:
+- 0.9
+- 0.1
+dataset_name: autogluon/chronos_datasets
+data_level: v100
+context_length: 512
+prediction_length: 64
+min_past: 512
+max_steps: 50000
+save_steps: 5000
+log_steps: 100
+per_device_train_batch_size: 16
+learning_rate: 0.001
+optim: adamw_torch
+num_samples: 20
+shuffle_buffer_length: 10000
+gradient_accumulation_steps: 8
+model_id: google/t5-efficient-tiny
+model_type: seq2seq
+random_init: true
+tie_embeddings: true
+output_dir: ./outputs/checkpoints/chronos_t5_tiny_v100_50k
+tf32: false
+fp16: true
+bf16: false
+torch_compile: false
+gradient_checkpointing: false
+tokenizer_class: MeanScaleUniformBins
+tokenizer_kwargs:
+  low_limit: -15.0
+  high_limit: 15.0
+n_tokens: 4096
+n_special_tokens: 2
+lr_scheduler_type: linear
+warmup_ratio: 0.0
+dataloader_num_workers: 2
+max_missing_prop: 0.9
+use_eos_token: true
+seed: 42

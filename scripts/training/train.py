@@ -238,6 +238,7 @@ def load_model(
     tie_embeddings=False,
     pad_token_id=0,
     eos_token_id=1,
+    gradient_checkpointing=False,
 ):
     """
     Load the specified HuggingFace model, adjusting the vocabulary
@@ -266,6 +267,10 @@ def load_model(
 
     model.config.pad_token_id = model.generation_config.pad_token_id = pad_token_id
     model.config.eos_token_id = model.generation_config.eos_token_id = eos_token_id
+    if gradient_checkpointing and hasattr(model, "gradient_checkpointing_enable"):
+        model.gradient_checkpointing_enable()
+        if hasattr(model.config, "use_cache"):
+            model.config.use_cache = False
 
     return model
 
@@ -599,7 +604,10 @@ def main(
     tie_embeddings: bool = False,
     output_dir: str = "./output/",
     tf32: bool = True,
+    fp16: bool = False,
+    bf16: bool = False,
     torch_compile: bool = True,
+    gradient_checkpointing: bool = False,
     tokenizer_class: str = "MeanScaleUniformBins",
     tokenizer_kwargs: str = "{'low_limit': -15.0, 'high_limit': 15.0}",
     n_tokens: int = 4096,
@@ -721,6 +729,7 @@ def main(
             tie_embeddings=tie_embeddings,
             pad_token_id=pad_token_id,
             eos_token_id=eos_token_id,
+            gradient_checkpointing=gradient_checkpointing,
         )
         update_training_progress(
             output_dir,
@@ -779,7 +788,10 @@ def main(
             gradient_accumulation_steps=gradient_accumulation_steps,
             dataloader_num_workers=dataloader_num_workers,
             tf32=tf32,  # remove this if not using Ampere GPUs (e.g., A100)
+            fp16=fp16,
+            bf16=bf16,
             torch_compile=torch_compile,
+            gradient_checkpointing=gradient_checkpointing,
             ddp_find_unused_parameters=False,
             remove_unused_columns=False,
         )
