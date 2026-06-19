@@ -2,6 +2,8 @@ training_data_paths:
 - "./data/local-benchmark/synthetic.arrow"
 probability:
 - 1.0
+dataset_name: local_benchmark_synthetic
+data_level: local_debug
 context_length: 64
 prediction_length: 16
 min_past: 64

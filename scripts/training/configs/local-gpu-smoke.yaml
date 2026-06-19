@@ -2,6 +2,8 @@ training_data_paths:
 - "./data/local-smoke/synthetic.arrow"
 probability:
 - 1.0
+dataset_name: local_smoke_synthetic
+data_level: smoke
 context_length: 32
 prediction_length: 8
 min_past: 32

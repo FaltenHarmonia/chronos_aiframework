@@ -615,6 +615,8 @@ def main(
     temperature: float = 1.0,
     top_k: int = 50,
     top_p: float = 1.0,
+    dataset_name: str = "unspecified",
+    data_level: str = "unspecified",
     seed: Optional[int] = None,
 ):
     if tf32 and not (
@@ -668,6 +670,8 @@ def main(
         output_dir = get_next_path("run", base_dir=output_dir, file_type="")
         output_dir.mkdir(parents=True, exist_ok=True)
         update_training_progress(output_dir, "config_parsed", seed=seed)
+        log_on_main(f"Dataset name: {dataset_name}", logger)
+        log_on_main(f"Data level: {data_level}", logger)
         save_preflight_info(output_dir, raw_training_config, training_data_paths)
 
         log_on_main(f"Logging dir: {output_dir}", logger)
@@ -689,6 +693,8 @@ def main(
             output_dir,
             "data_preflight_complete",
             data_paths=describe_training_data_paths(training_data_paths),
+            dataset_name=dataset_name,
+            data_level=data_level,
         )
 
         train_datasets = [

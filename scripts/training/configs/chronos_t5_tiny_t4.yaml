@@ -1,7 +1,11 @@
 training_data_paths:
-- "./data/processed/train.arrow"
+- "./data/processed/chronos_tsmixup_90k.arrow"
+- "./data/processed/chronos_kernel_synth_10k.arrow"
 probability:
-- 1.0
+- 0.9
+- 0.1
+dataset_name: autogluon/chronos_datasets
+data_level: recommended
 context_length: 256
 prediction_length: 32
 min_past: 256
