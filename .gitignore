@@ -172,8 +172,8 @@ chronos-2-finetuned
 nohup.out
 
 # Training outputs - model checkpoints are too large for git
-output/
-outputs/
+# output/
+# outputs/
 
 # Checkpoint binary files (optimizer states, model weights, etc.)
 **/checkpoint-*/optimizer.pt

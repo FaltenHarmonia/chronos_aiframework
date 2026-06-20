@@ -1,0 +1,27 @@
+{
+    "stage": "training_main",
+    "failed_at": "2026-06-20T14:19:29",
+    "exception_type": "FileNotFoundError",
+    "exception": "Training data files not found: ['./data/processed/chronos_tsmixup_90k.arrow', './data/processed/chronos_kernel_synth_10k.arrow']",
+    "traceback": "Traceback (most recent call last):\n  File \"/home/ma-user/work/chronos_aiframework/scripts/training/train.py\", line 711, in main\n    raise FileNotFoundError(f\"Training data files not found: {missing_paths}\")\nFileNotFoundError: Training data files not found: ['./data/processed/chronos_tsmixup_90k.arrow', './data/processed/chronos_kernel_synth_10k.arrow']\n",
+    "job_info": {
+        "cuda_available": true,
+        "device_count": 1,
+        "device_names": {
+            "0": "Tesla T4"
+        },
+        "mem_info": {
+            "0": [
+                15738863616,
+                15843721216
+            ]
+        },
+        "torchelastic_launched": false,
+        "python_version": "3.9.11 (main, Mar 29 2022, 19:08:29)  [GCC 7.5.0]",
+        "torch_version": "1.12.1+cu102",
+        "numpy_version": "1.24.2",
+        "gluonts_version": "0.16.2",
+        "transformers_version": "4.29.2",
+        "accelerate_version": "0.27.2"
+    }
+}

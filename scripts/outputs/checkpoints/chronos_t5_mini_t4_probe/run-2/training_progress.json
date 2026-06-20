@@ -1,0 +1,5 @@
+{
+    "stage": "complete",
+    "updated_at": "2026-06-20T13:20:48",
+    "final_checkpoint": "outputs/checkpoints/chronos_t5_mini_t4_probe/run-2/checkpoint-final"
+}

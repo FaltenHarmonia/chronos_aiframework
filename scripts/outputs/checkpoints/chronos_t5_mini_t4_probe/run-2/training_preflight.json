@@ -1,0 +1,88 @@
+{
+    "training_config": {
+        "training_data_paths": "['../data/processed/chronos_tsmixup_90k.arrow', '../data/processed/chronos_kernel_synth_10k.arrow']",
+        "probability": "[0.9, 0.1]",
+        "context_length": 512,
+        "max_steps": 10000,
+        "save_steps": 2500,
+        "log_steps": 100,
+        "per_device_train_batch_size": 32,
+        "learning_rate": 0.001,
+        "optim": "adamw_torch",
+        "shuffle_buffer_length": 10000,
+        "gradient_accumulation_steps": 1,
+        "model_id": "google/t5-efficient-mini",
+        "model_type": "seq2seq",
+        "random_init": true,
+        "tie_embeddings": true,
+        "output_dir": "./outputs/checkpoints/chronos_t5_mini_t4_probe",
+        "tf32": false,
+        "fp16": true,
+        "bf16": false,
+        "torch_compile": false,
+        "gradient_checkpointing": true,
+        "tokenizer_class": "MeanScaleUniformBins",
+        "tokenizer_kwargs": "{'low_limit': -15.0, 'high_limit': 15.0}",
+        "n_tokens": 4096,
+        "n_special_tokens": 2,
+        "pad_token_id": 0,
+        "eos_token_id": 1,
+        "use_eos_token": true,
+        "lr_scheduler_type": "linear",
+        "warmup_ratio": 0.0,
+        "dataloader_num_workers": 2,
+        "num_samples": 20,
+        "temperature": 1.0,
+        "top_k": 50,
+        "top_p": 1.0,
+        "dataset_name": "autogluon/chronos_datasets",
+        "data_level": "recommended",
+        "seed": 42,
+        "resume_from_checkpoint": null,
+        "max_missing_prop": 0.9,
+        "min_past": 512,
+        "prediction_length": 64
+    },
+    "job_info": {
+        "cuda_available": true,
+        "device_count": 1,
+        "device_names": {
+            "0": "Tesla T4"
+        },
+        "mem_info": {
+            "0": [
+                15738863616,
+                15843721216
+            ]
+        },
+        "torchelastic_launched": false,
+        "python_version": "3.9.11 (main, Mar 29 2022, 19:08:29)  [GCC 7.5.0]",
+        "torch_version": "1.12.1+cu102",
+        "numpy_version": "1.24.2",
+        "gluonts_version": "0.16.2",
+        "transformers_version": "4.29.2",
+        "accelerate_version": "0.27.2"
+    },
+    "data_paths": [
+        {
+            "path": "../data/processed/chronos_tsmixup_90k.arrow",
+            "exists": true,
+            "is_file": true,
+            "bytes": 366480634,
+            "modified_at": "2026-06-20T11:13:27"
+        },
+        {
+            "path": "../data/processed/chronos_kernel_synth_10k.arrow",
+            "exists": true,
+            "is_file": true,
+            "bytes": 40901682,
+            "modified_at": "2026-06-20T11:16:12"
+        }
+    ],
+    "cwd": "/home/ma-user/work/chronos_aiframework/scripts",
+    "argv": [
+        "training/train.py",
+        "--config",
+        "training/configs/chronos_t5_mini_t4_10000.yaml"
+    ]
+}
