@@ -172,14 +172,8 @@ chronos-2-finetuned
 nohup.out
 
 # Training outputs - model checkpoints are too large for git
-# output/
-# outputs/
+output/
+outputs/
 
 # Checkpoint binary files (optimizer states, model weights, etc.)
-**/checkpoint-*/optimizer.pt
-**/checkpoint-*/pytorch_model.bin
-**/checkpoint-*/scaler.pt
-**/checkpoint-*/scheduler.pt
-**/checkpoint-*/rng_state.pth
-**/checkpoint-*/training_args.bin
-**/checkpoint-final/
+chronos_aiframework/scripts/outputs/

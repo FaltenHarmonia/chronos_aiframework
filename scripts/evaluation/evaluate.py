@@ -220,7 +220,8 @@ def chronos(
     assert isinstance(torch_dtype, torch.dtype)
 
     # Load Chronos
-    pipeline = BaseChronosPipeline.from_pretrained(model_id, device_map=device, torch_dtype=torch_dtype)
+    # Use "auto" for device_map compatibility with older transformers versions
+    pipeline = BaseChronosPipeline.from_pretrained(model_id, device_map="auto", torch_dtype=torch_dtype)
 
     assert isinstance(pipeline, ChronosPipeline)
 
@@ -274,7 +275,8 @@ def chronos_bolt(
     assert isinstance(torch_dtype, torch.dtype)
 
     # Load Chronos
-    pipeline = BaseChronosPipeline.from_pretrained(model_id, device_map=device, torch_dtype=torch_dtype)
+    # Use "auto" for device_map compatibility with older transformers versions
+    pipeline = BaseChronosPipeline.from_pretrained(model_id, device_map="auto", torch_dtype=torch_dtype)
 
     assert isinstance(pipeline, ChronosBoltPipeline)
 
@@ -325,7 +327,8 @@ def chronos_2(
     assert isinstance(torch_dtype, torch.dtype)
 
     # Load Chronos
-    pipeline = BaseChronosPipeline.from_pretrained(model_id, device_map=device, torch_dtype=torch_dtype)
+    # Use "auto" for device_map compatibility with older transformers versions
+    pipeline = BaseChronosPipeline.from_pretrained(model_id, device_map="auto", torch_dtype=torch_dtype)
 
     assert isinstance(pipeline, Chronos2Pipeline)
 
