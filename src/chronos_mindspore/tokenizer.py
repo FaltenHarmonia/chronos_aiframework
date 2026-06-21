@@ -45,6 +45,7 @@ class ChronosConfig:
 
 class ChronosTokenizer:
     """Base class for Chronos tokenizers."""
+    config: Any  # Expected to be ChronosConfig; set by subclasses
 
     def context_input_transform(self, context: Tensor) -> Tuple:
         raise NotImplementedError()

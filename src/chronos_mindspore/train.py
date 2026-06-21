@@ -199,7 +199,7 @@ def main(
     drop_prob: float = 0.2,
     max_missing_prop: float = 0.9,
     shuffle_buffer_length: int = 100,
-    output_dir: str = "./outputs_mindspore/",
+    output_dir: "str | Path" = "./outputs_mindspore/",
     seed: Optional[int] = None,
     fp16: bool = False,
 ):
