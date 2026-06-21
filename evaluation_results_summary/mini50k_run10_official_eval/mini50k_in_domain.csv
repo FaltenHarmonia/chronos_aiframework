@@ -1,0 +1,16 @@
+dataset,model,MASE,WQL
+electricity_15min,outputs\checkpoints\chronos_t5_mini_t4_probe\run-10\checkpoint-final,0.6898343891778893,0.11108691397901052
+m4_daily,outputs\checkpoints\chronos_t5_mini_t4_probe\run-10\checkpoint-final,3.3151304436086657,0.022805286189682028
+m4_hourly,outputs\checkpoints\chronos_t5_mini_t4_probe\run-10\checkpoint-final,1.6093856984378279,0.04621142918394577
+m4_monthly,outputs\checkpoints\chronos_t5_mini_t4_probe\run-10\checkpoint-final,1.0860512142634597,0.11289347194686715
+m4_weekly,outputs\checkpoints\chronos_t5_mini_t4_probe\run-10\checkpoint-final,2.6178329009983683,0.051094392058778214
+monash_electricity_hourly,outputs\checkpoints\chronos_t5_mini_t4_probe\run-10\checkpoint-final,1.738120875701198,0.1302206362877156
+monash_electricity_weekly,outputs\checkpoints\chronos_t5_mini_t4_probe\run-10\checkpoint-final,2.4459434570657734,0.10337529841809462
+monash_kdd_cup_2018,outputs\checkpoints\chronos_t5_mini_t4_probe\run-10\checkpoint-final,0.7611921340399999,0.3468988363374168
+monash_london_smart_meters,outputs\checkpoints\chronos_t5_mini_t4_probe\run-10\checkpoint-final,0.9932803792040731,0.518235842792836
+monash_pedestrian_counts,outputs\checkpoints\chronos_t5_mini_t4_probe\run-10\checkpoint-final,0.37332318205048437,0.28831556882063614
+monash_rideshare,outputs\checkpoints\chronos_t5_mini_t4_probe\run-10\checkpoint-final,0.8610165267562991,0.16062316040005478
+monash_temperature_rain,outputs\checkpoints\chronos_t5_mini_t4_probe\run-10\checkpoint-final,0.9851020227318059,0.7734696842273752
+taxi_30min,outputs\checkpoints\chronos_t5_mini_t4_probe\run-10\checkpoint-final,1.4207607950669894,0.5074978869180973
+uber_tlc_daily,outputs\checkpoints\chronos_t5_mini_t4_probe\run-10\checkpoint-final,1.0370235680553768,0.13773513743732188
+uber_tlc_hourly,outputs\checkpoints\chronos_t5_mini_t4_probe\run-10\checkpoint-final,0.7840299221814132,0.21461598891934475

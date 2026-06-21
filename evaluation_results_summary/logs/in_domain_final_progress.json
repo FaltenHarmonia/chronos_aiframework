@@ -1,0 +1,24 @@
+{
+  "status": "complete",
+  "stage": "suite_complete",
+  "dataset_total": 15,
+  "completed_datasets": [
+    "electricity_15min",
+    "monash_electricity_hourly",
+    "monash_electricity_weekly",
+    "monash_kdd_cup_2018",
+    "m4_daily",
+    "m4_hourly",
+    "m4_monthly",
+    "m4_weekly",
+    "monash_pedestrian_counts",
+    "taxi_30min",
+    "uber_tlc_hourly",
+    "uber_tlc_daily",
+    "monash_rideshare",
+    "monash_temperature_rain",
+    "monash_london_smart_meters"
+  ],
+  "metrics_path": "outputs\\evaluation\\chronos_t5_mini_run10_full_local_bs8_official\\chronos_t5_mini_run10_full_local_bs8_official-checkpoint-final-in-domain.csv",
+  "updated_at": "2026-06-21T15:20:05"
+}

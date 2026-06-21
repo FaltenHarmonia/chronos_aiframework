@@ -1,0 +1,13 @@
+{
+  "datasets": 27,
+  "metrics": {
+    "MASE": {
+      "geomean_relative": 0.9351692000556496,
+      "mean_relative": 0.9611686507182546
+    },
+    "WQL": {
+      "geomean_relative": 0.808626787903334,
+      "mean_relative": 0.8576037368577673
+    }
+  }
+}

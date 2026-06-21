@@ -95,12 +95,14 @@ def main():
 
         for suite in suites:
             metrics_path = output_dir / f"{args.model_name}-{checkpoint}-{suite}.csv"
+            suite_progress_path = output_dir / f"{args.model_name}-{checkpoint}-{suite}.progress.json"
             if metrics_path.exists() and not args.overwrite:
                 rows.append(
                     {
                         "checkpoint": checkpoint,
                         "suite": suite,
                         "metrics_path": str(metrics_path),
+                        "suite_progress_path": str(suite_progress_path),
                         "status": "skipped_existing",
                         "rows": count_csv_rows(metrics_path),
                         "seconds": 0.0,
@@ -116,6 +118,7 @@ def main():
                     "suite": suite,
                     "model_id": str(checkpoint_path),
                     "metrics_path": str(metrics_path),
+                    "suite_progress_path": str(suite_progress_path),
                     "updated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
                 },
             )
@@ -136,6 +139,8 @@ def main():
                 str(args.batch_size),
                 "--num-samples",
                 str(args.num_samples),
+                "--progress-path",
+                str(suite_progress_path),
             ]
             try:
                 subprocess.run(cmd, check=True)

@@ -177,3 +177,5 @@ outputs/
 
 # Checkpoint binary files (optimizer states, model weights, etc.)
 chronos_aiframework/scripts/outputs/
+/outputs1/
+/cache/

@@ -1,0 +1,6 @@
+{
+  "status": "complete",
+  "completed_at": "2026-06-21T15:20:07",
+  "summary_path": "outputs\\evaluation\\chronos_t5_mini_run10_full_local_bs8_official\\evaluation_summary.csv",
+  "result_count": 1
+}

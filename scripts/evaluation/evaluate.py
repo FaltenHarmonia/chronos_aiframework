@@ -1,4 +1,7 @@
 import logging
+import json
+import os
+import time
 from pathlib import Path
 from typing import Iterable, Optional
 
@@ -20,6 +23,13 @@ from chronos import BaseChronosPipeline, Chronos2Pipeline, ChronosBoltPipeline, 
 app = typer.Typer(pretty_exceptions_enable=False)
 
 QUANTILES = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+
+
+def atomic_write_json(path: Path, payload: dict):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_suffix(path.suffix + ".tmp")
+    tmp_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    os.replace(tmp_path, path)
 
 
 def to_gluonts_univariate(hf_dataset: datasets.Dataset):
@@ -119,6 +129,7 @@ def eval_pipeline_and_save_results(
     metrics_path: Path,
     model_id: str,
     batch_size: int,
+    progress_path: Optional[Path] = None,
     **predict_kwargs,
 ):
     # Load backtest configs
@@ -126,14 +137,43 @@ def eval_pipeline_and_save_results(
         backtest_configs = yaml.safe_load(fp)
 
     result_rows = []
-    for config in backtest_configs:
+    for dataset_index, config in enumerate(backtest_configs, start=1):
         dataset_name = config["name"]
         prediction_length = config["prediction_length"]
+        if progress_path is not None:
+            atomic_write_json(
+                progress_path,
+                {
+                    "status": "running",
+                    "stage": "loading_dataset",
+                    "dataset_index": dataset_index,
+                    "dataset_total": len(backtest_configs),
+                    "current_dataset": dataset_name,
+                    "config_path": str(config_path),
+                    "metrics_path": str(metrics_path),
+                    "updated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                },
+            )
 
         logger.info(f"Loading {dataset_name}")
         test_data = load_and_split_dataset(backtest_config=config)
 
         logger.info(f"Generating forecasts for {dataset_name} ({len(test_data.input)} time series)")
+        if progress_path is not None:
+            atomic_write_json(
+                progress_path,
+                {
+                    "status": "running",
+                    "stage": "generating_forecasts",
+                    "dataset_index": dataset_index,
+                    "dataset_total": len(backtest_configs),
+                    "current_dataset": dataset_name,
+                    "test_series": len(test_data.input),
+                    "prediction_length": prediction_length,
+                    "metrics_path": str(metrics_path),
+                    "updated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                },
+            )
         forecasts = generate_forecasts(
             test_data.input,
             pipeline=pipeline,
@@ -143,6 +183,19 @@ def eval_pipeline_and_save_results(
         )
 
         logger.info(f"Evaluating forecasts for {dataset_name}")
+        if progress_path is not None:
+            atomic_write_json(
+                progress_path,
+                {
+                    "status": "running",
+                    "stage": "computing_metrics",
+                    "dataset_index": dataset_index,
+                    "dataset_total": len(backtest_configs),
+                    "current_dataset": dataset_name,
+                    "metrics_path": str(metrics_path),
+                    "updated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                },
+            )
         metrics = (
             evaluate_forecasts(
                 forecasts,
@@ -157,6 +210,20 @@ def eval_pipeline_and_save_results(
             .to_dict(orient="records")
         )
         result_rows.append({"dataset": dataset_name, "model": model_id, **metrics[0]})
+        if progress_path is not None:
+            atomic_write_json(
+                progress_path,
+                {
+                    "status": "running",
+                    "stage": "dataset_complete",
+                    "dataset_index": dataset_index,
+                    "dataset_total": len(backtest_configs),
+                    "current_dataset": dataset_name,
+                    "completed_datasets": [row["dataset"] for row in result_rows],
+                    "metrics_path": str(metrics_path),
+                    "updated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                },
+            )
 
     # Save results to a CSV file
     results_df = (
@@ -168,6 +235,18 @@ def eval_pipeline_and_save_results(
         .sort_values(by="dataset")
     )
     results_df.to_csv(metrics_path, index=False)
+    if progress_path is not None:
+        atomic_write_json(
+            progress_path,
+            {
+                "status": "complete",
+                "stage": "suite_complete",
+                "dataset_total": len(backtest_configs),
+                "completed_datasets": [row["dataset"] for row in result_rows],
+                "metrics_path": str(metrics_path),
+                "updated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            },
+        )
 
 
 @app.command()
@@ -182,6 +261,7 @@ def chronos(
     temperature: Optional[float] = None,
     top_k: Optional[int] = None,
     top_p: Optional[float] = None,
+    progress_path: Optional[Path] = None,
 ):
     """Evaluate Chronos models.
 
@@ -231,6 +311,7 @@ def chronos(
         metrics_path=metrics_path,
         model_id=model_id,
         batch_size=batch_size,
+        progress_path=progress_path,
         num_samples=num_samples,
         temperature=temperature,
         top_k=top_k,
@@ -246,6 +327,7 @@ def chronos_bolt(
     device: str = "cuda",
     torch_dtype: str = "float32",
     batch_size: int = 32,
+    progress_path: Optional[Path] = None,
 ):
     """Evaluate Chronos-Bolt models.
 
@@ -286,6 +368,7 @@ def chronos_bolt(
         metrics_path=metrics_path,
         model_id=model_id,
         batch_size=batch_size,
+        progress_path=progress_path,
     )
 
 
@@ -298,6 +381,7 @@ def chronos_2(
     torch_dtype: str = "float32",
     batch_size: int = 32,
     cross_learning: bool = False,
+    progress_path: Optional[Path] = None,
 ):
     """Evaluate Chronos-2 models.
 
@@ -338,6 +422,7 @@ def chronos_2(
         metrics_path=metrics_path,
         model_id=model_id,
         batch_size=batch_size,
+        progress_path=progress_path,
         cross_learning=cross_learning,
     )
 
